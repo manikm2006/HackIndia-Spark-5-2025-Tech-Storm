@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Timetable Extractor</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@tailwindcss/browser@latest"></script>
+    <style>
+        /* Custom styles for the table header to ensure they stand out */
+        #timetable-table thead tr {
+            background-color: #f0f4f8; /* Tailwind's gray-100 */
+        }
+        #timetable-table th {
+            color: #4b5563; /* Tailwind's gray-600 */
+            font-weight: 500; /* Tailwind's font-medium */
+            padding-top: 0.75rem;
+            padding-bottom: 0.75rem;
+            padding-left: 1rem;
+            padding-right: 1rem;
+            text-align: left;
+            border-bottom-width: 1px;
+            border-color: #d1d5db; /* Tailwind's gray-300 */
+        }
+        #timetable-table td {
+            padding-top: 0.75rem;
+            padding-bottom: 0.75rem;
+            padding-left: 1rem;
+            padding-right: 1rem;
+            border-bottom-width: 1px;
+            border-color: #e5e7eb; /* Tailwind's gray-200 */
+        }
+
+        #timetable-table tbody tr:nth-child(odd) {
+            background-color: #f9fafb; /* Tailwind's gray-50 */
+        }
+
+        #timetable-table tbody tr:hover {
+            background-color: #f0f0f0; /* Light gray hover effect */
+        }
+
+    </style>
+</head>
+<body class="bg-gray-100 font-inter antialiased">
+    <div class="container mx-auto px-4 py-10">
+        <h1 class="text-3xl font-semibold text-blue-600 text-center mb-8">Timetable Extractor</h1>
+
+        <div class="bg-white shadow-md rounded-lg p-6 mb-8">
+            <form id="section-form" method="POST" action="/timetable" class="mb-4">
+                <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                    <label for="section" class="block text-gray-700 text-sm font-bold mb-2 sm:mb-0 min-w-[120px]">Select Section:</label>
+                    <input type="text" id="section" name="section" required
+                           class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline
+                                  focus:border-blue-500 transition-colors duration-300">
+                    <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline
+                                             transition-colors duration-300">
+                        Get Timetable
+                    </button>
+                </div>
+            </form>
+            <div id="error-message" class="text-red-500 text-xs italic mt-4" style="display: none;"></div>
+        </div>
+
+        <div id="timetable-container" class="bg-white shadow-md rounded-lg p-6" style="display: none;">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-4">Timetable for <span id="section-name" class="text-blue-500"></span></h2>
+            <div class="overflow-x-auto">
+                <table id="timetable-table" class="min-w-full rounded-lg">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="px-4 py-2 text-left text-gray-600 font-semibold uppercase">Day</th>
+                            <th class="px-4 py-2 text-left text-gray-600 font-semibold uppercase">Time</th>
+                            <th class="px-4 py-2 text-left text-gray-600 font-semibold uppercase">Subject</th>
+                            <th class="px-4 py-2 text-left text-gray-600 font-semibold uppercase">Room</th>
+                            <th class="px-4 py-2 text-left text-gray-600 font-semibold uppercase">Group</th>
+                            <th class="px-4 py-2 text-left text-gray-600 font-semibold uppercase">Raw Text</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white">
+                        <tr>
+                            <td colspan="6" class="px-4 py-2 text-center text-gray-500">Loading...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const sectionForm = document.getElementById('section-form');
+        const timetableContainer = document.getElementById('timetable-container');
+        const sectionNameDisplay = document.getElementById('section-name');
+        const timetableTable = document.getElementById('timetable-table');
+        const errorMessage = document.getElementById('error-message');
+
+        sectionForm.addEventListener('submit', (event) => {
+            event.preventDefault(); // Prevent the default form submission
+
+            const section = document.getElementById('section').value;
+
+            // Show loading state
+            timetableContainer.style.display = 'none';
+            errorMessage.style.display = 'none';
+            timetableTable.querySelector('tbody').innerHTML = '<tr><td colspan="6" class="px-4 py-2 text-center text-gray-500">Loading...</td></tr>';
+
+            fetch('/timetable', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded', // Important for form data
+                },
+                body: `section=${encodeURIComponent(section)}`, // Send form data
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(err => { throw new Error(err.error || 'An error occurred.'); });
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.error) {
+                    errorMessage.textContent = data.error;
+                    errorMessage.style.display = 'block';
+                    timetableContainer.style.display = 'none'; // Hide table on error
+                } else {
+                    sectionNameDisplay.textContent = data.section;
+                    timetableTable.querySelector('tbody').innerHTML = ''; // Clear previous table data
+
+                    data.timetable.forEach(entry => {
+                        const row = timetableTable.insertRow();
+                        row.insertCell().textContent = entry.day;
+                        row.insertCell().textContent = entry.time;
+                        row.insertCell().textContent = entry.subject;
+                        row.insertCell().textContent = entry.room;
+                        row.insertCell().textContent = entry.group;
+                        row.insertCell().textContent = entry.raw_text;
+                    });
+
+                    timetableContainer.style.display = 'block';
+                }
+            })
+            .catch(error => {
+                errorMessage.textContent = error.message;
+                errorMessage.style.display = 'block';
+                timetableContainer.style.display = 'none'; // Hide table on error
+                console.error('Error:', error);
+            });
+        });
+    </script>
+</body>
+</html>
